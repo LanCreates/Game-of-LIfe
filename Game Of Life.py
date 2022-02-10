@@ -9,8 +9,11 @@ from pygame.locals import (
     QUIT, KEYDOWN
 )
 
+pg.init()
+
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
+GRAY = tuple([x // 2 for x in WHITE])
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
@@ -18,11 +21,11 @@ MAGENTA = (255, 0, 255)
 YELLOW = (255, 255, 0)
 CYAN = (0, 255, 255)
 
+VERSION = "0.2"
+
 class GameOfLife:
-    _speed_ptr = 1
-    _speed = (0, 0.1, 0.5)
     _mult = 10 # One pixel = 10px
-    _footer_sz = 50
+    _footer_sz = 80
 
     def __init__(self, size: tuple):
         self._length = ((size[0] if size[0] > 500 else False) or 500)
@@ -30,19 +33,16 @@ class GameOfLife:
         self._state = {x: {y: 0 for y in range((self._width - self._footer_sz) // 10)} for x in range((self._length) // 10)}
 
         # Window related
-        self._surface = pg.display.set_mode((self._length, self._width))
+        self._SURFACE = pg.display.set_mode((self._length, self._width))
         pg.display.set_caption("Game Of Life")
 
-    def border(self):
-        _border = pg.Surface((self._mult, self._mult))
-        _border.fill(BLUE)
-        self._surface.blit(_border, ((((self._length - self._footer_sz) // 10)*self._mult,
-                                      ((self._width - self._footer_sz) // 10 + 10)*self._mult)))
+    _speed_ptr = 1
+    _speed = (0.05, 0.1, 0.2)
 
     @classmethod
     def alter_speed(cls, opt):
-        if opt: cls._speed_ptr += (1 if cls._speed_ptr != 2 else 0)
-        else: cls._speed_ptr -= (1 if cls._speed_ptr != 0 else 0)
+        if opt: cls._speed_ptr -= (1 if cls._speed_ptr != 0 else 0)
+        else: cls._speed_ptr += (1 if cls._speed_ptr != 2 else 0)
     
     def rand_seed(self):
         return (((random.randint(0, len(self._state) - 1), 
@@ -86,19 +86,57 @@ class GameOfLife:
             for col in self._state.keys():
                 pixel = pg.Surface((self._mult, self._mult))
                 pixel.fill({0: BLACK, 1: WHITE}[self._state[row][col]])
-                self._surface.blit(pixel, ((row)*self._mult, (col)*self._mult))
+                self._SURFACE.blit(pixel, ((row)*self._mult, (col)*self._mult))
 
     def reset(self):
         self._state = {x: {y: 0 for y in range(self._width)} for x in range(self._length)}
         self.render()
 
+    _background = BLACK
+    def disp_border(self):
+        BORDER = pg.Surface((self._length, (self._mult // 2)))
+        BORDER.fill(GRAY)
+        self._SURFACE.blit(BORDER, (0, self._width - self._footer_sz))
+    
+    TX16 = pg.font.Font("assets/guifont.ttf", 16)
+    TX12 = pg.font.Font("assets/guifont.ttf", 12)
+    
+    def disp_speed(self):
+        text = self.TX16.render(f"Speed {('2', '1', '.5')[self._speed_ptr]:>2}x", True, WHITE, self._background)
+        self._SURFACE.blit(text, (5, self._width - self._footer_sz + 10))
+
+    def disp_version(self):
+        text1 = self.TX12.render(f"{'version':>8}", True, WHITE, self._background)
+        text2 = self.TX12.render(f"{VERSION:>8}", True, WHITE, self._background)
+        self._SURFACE.blit(text1, (self._length - 6*self._mult,
+                            self._width - 3*self._mult))
+        self._SURFACE.blit(text2, (self._length - 6*self._mult,
+                            self._width - 2*self._mult))
+    IMG_0X = pg.image.load("assets/Stop.png")
+    IMG_05X = pg.image.load("assets/Speed05x.png")
+    IMG_1X = pg.image.load("assets/Speed1x.png")
+    IMG_2X = pg.image.load("assets/Speed2x.png")
+    BLANK = pg.Surface((64, 64))
+    BLANK.fill(_background)
+
+    halted = True
+    def disp_is_stopped(self):
+        self._SURFACE.blit({True: self.IMG_0X, False: self.BLANK}[self.halted],
+                (3*self._mult, self._width - self._footer_sz + 3*self._mult))
+
+    def disp_speed_icons(self):
+        self._SURFACE.blit(self.BLANK, (0, self._width - self._footer_sz + 3*self._mult))
+        self._SURFACE.blit({2: self.IMG_05X, 1: self.IMG_1X, 0: self.IMG_2X}[self._speed_ptr],
+                (0, self._width - self._footer_sz + 3*self._mult))
+
 def main():
     # Initial
-    halted = True
     running = True
-    pg.init()
+
     # Profile
-    Game = GameOfLife((500, 500))
+    Game = GameOfLife((600, 600))
+    Game.disp_border()
+    Game.disp_version()
     seed = tuple([(x, x) for x in range(len(Game._state))] + 
                  [(x, len(Game._state) - 1 - x) for x in range(len(Game._state))] +
                  [((len(Game._state) - 1) // 2, y) for y in range(len(Game._state[0]))] + 
@@ -118,13 +156,16 @@ def main():
 
                 # Only one key at a time
                 if key == K_ESCAPE: running = False
-                elif key == K_SPACE: halted = {True: False, False: True}[halted]
+                elif key == K_SPACE: Game.halted = {True: False, False: True}[Game.halted]
                 elif key in (K_UP, K_DOWN): Game.alter_speed({K_UP: 1, K_DOWN: 0}[key])
 
-        if not halted:
+        if not Game.halted:
             Game.update()
             Game.render()
             time.sleep(Game._speed[Game._speed_ptr])
+        Game.disp_speed_icons()
+        Game.disp_is_stopped()
+        Game.disp_speed()
         pg.display.flip()
     pg.quit()
 
