@@ -22,7 +22,12 @@ MAGENTA = (255, 0, 255)
 YELLOW = (255, 255, 0)
 CYAN = (0, 255, 255)
 
-VERSION = "0.2"
+VERSION = "0.3"
+
+class Animation:
+    def vert_swipe(self, begin, end, screen_info):
+        """Screen_info is a tuple of screen length, width, and unit used"""
+        pass
 
 class GameOfLife:
     _mult = 10 # One pixel = 10px
@@ -46,14 +51,26 @@ class GameOfLife:
         else: cls._speed_ptr += (1 if cls._speed_ptr != len(cls._speed) else 0)
     
     def rand_seed(self):
-        return (((random.randint(0, len(self._state) - 1), 
-                random.randint(0, len(self._state[0]) - 1))) for _ in range(random.randint(0, 
+        return tuple(((random.randint(0, len(self._state) - 1), 
+                        random.randint(0, len(self._state[0]) - 1))) for _ in range(random.randint(0, 
                                                                         len(self._state[0])* len(self._state) - 1)))
+    def get_seed(self):
+        with open("game_seed.txt", 'r') as sd:
+            text = sd.readlines()
+            try:
+                if text[0].strip() == "random":
+                    return self.rand_seed()
+                else:
+                    # Getting delimiter
+                    delimiter = ''.join([d for d in text[2] if not d.isnumeric()])
+                    return tuple(map(lambda x: tuple(map(int, x.strip().split())), text[1:]))
+            except IndexError:
+                pass
 
     def plant_seed(self, seed):
         for pos in seed:
             self._state[pos[0]][pos[1]] = 1
-
+    
     def update(self):
         temp = copy.deepcopy(self._state)
         for row in temp.keys():
@@ -88,11 +105,14 @@ class GameOfLife:
                 pixel.fill({0: BLACK, 1: WHITE}[self._state[row][col]])
                 self._SURFACE.blit(pixel, ((row)*self._mult, (col)*self._mult))
 
-    def reset(self):
-        self._state = {x: {y: 0 for y in range(self._width)} for x in range(self._length)}
-        self.render()
-
     _background = BLACK
+    def clear(self):
+        self._state = {x: {y: 0 for y in range((self._width - self._footer_sz) // 10)} for x in range(self._length // 10)}
+        blank_scr = pg.Surface((self._length, self._width - self._footer_sz))
+        blank_scr.fill(BLUE)#self._background)
+        self._SURFACE.blit(blank_scr, (0, 0))
+        pg.display.flip()
+
     def disp_border(self):
         BORDER = pg.Surface((self._length, (self._mult // 2)))
         BORDER.fill(GRAY)
@@ -117,7 +137,7 @@ class GameOfLife:
     IMG_05X = pg.image.load("assets/Speed05x.png")
     IMG_1X = pg.image.load("assets/Speed1x.png")
     IMG_2X = pg.image.load("assets/Speed2x.png")
-    IMG_4X = pg.image.load("assets/Speed4x.png") # Temporary
+    IMG_4X = pg.image.load("assets/Speed4x.png")
     BLANK = pg.Surface((64, 64))
     BLANK.fill(_background)
 
@@ -131,30 +151,17 @@ class GameOfLife:
         self._SURFACE.blit({3: self.IMG_05X, 2: self.IMG_1X, 1: self.IMG_2X, 0: self.IMG_4X}[self._speed_ptr],
                 (0, self._width - self._footer_sz + 3*self._mult))
 
-class Main_Menu:
-    def display_main_menu(self):
-        pass
-
-    def __init__(self, length, width):
-        self._length = length
-        self._width = width
-        self.display_main_menu()
-
-    def get_input(self):
-        print()
-
 def main():
     # Initial
     running = True
-
+    command = ''
     # Profile
-    Menu = Main_Menu(1000, 600)
-    Game = GameOfLife((Menu._length, Menu._width))
+    Game = GameOfLife((1000, 600))
     Game.disp_border()
     Game.disp_version()
-    seed = Game.rand_seed()
 
     # Process
+    seed = Game.get_seed()
     Game.plant_seed(seed)
     Game.render()
     pg.display.flip()
@@ -167,16 +174,23 @@ def main():
                 running = False
             elif event.type == KEYDOWN:
                 key = event.key
-
-                # Only one key at a time
                 if key == K_ESCAPE: running = False
                 elif key == K_SPACE: Game.halted = {True: False, False: True}[Game.halted]
                 elif key in (K_UP, K_DOWN): Game.alter_speed({K_UP: 1, K_DOWN: 0}[key])
+            
+            if Game.halted:
+                if event.type == KEYDOWN:
+                    key = event.key
+                    if key == K_r: 
+                        Game.clear()
+                        Game.plant_seed(seed)
+                        Game.render()
 
         if not Game.halted:
             Game.update()
             Game.render()
             time.sleep(Game._speed[Game._speed_ptr])
+
         Game.disp_speed_icons()
         Game.disp_is_stopped()
         Game.disp_speed()
