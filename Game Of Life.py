@@ -4,6 +4,7 @@ import time
 import random
 
 from pygame.locals import (
+    K_r,
     K_UP, K_DOWN,
     K_ESCAPE, K_SPACE,
     QUIT, KEYDOWN
@@ -30,19 +31,19 @@ class GameOfLife:
     def __init__(self, size: tuple):
         self._length = ((size[0] if size[0] > 500 else False) or 500)
         self._width = ((size[1] if size[1] > 500 else False) or 500) + self._footer_sz
-        self._state = {x: {y: 0 for y in range((self._width - self._footer_sz) // 10)} for x in range((self._length) // 10)}
+        self._state = {x: {y: 0 for y in range((self._width - self._footer_sz) // 10)} for x in range(self._length // 10)}
 
         # Window related
         self._SURFACE = pg.display.set_mode((self._length, self._width))
         pg.display.set_caption("Game Of Life")
 
-    _speed_ptr = 1
-    _speed = (0.05, 0.1, 0.2)
+    _speed = (0.025, 0.05, 0.1, 0.2)
+    _speed_ptr = len(_speed) - 2
 
     @classmethod
     def alter_speed(cls, opt):
         if opt: cls._speed_ptr -= (1 if cls._speed_ptr != 0 else 0)
-        else: cls._speed_ptr += (1 if cls._speed_ptr != 2 else 0)
+        else: cls._speed_ptr += (1 if cls._speed_ptr != len(cls._speed) else 0)
     
     def rand_seed(self):
         return (((random.randint(0, len(self._state) - 1), 
@@ -61,8 +62,7 @@ class GameOfLife:
             for col in temp[row].keys():
                 neighbors = 0
                 c_left = False if col == 0 else True
-                c_right = False if col == len(self._state[0]) - 1 else True
-                
+                c_right = False if col == len(temp[row]) - 1 else True
                 if c_up:
                     neighbors += temp[row - 1][col]
                     if c_right: neighbors += temp[row - 1][col + 1]
@@ -83,7 +83,7 @@ class GameOfLife:
                     
     def render(self):
         for row in self._state.keys():
-            for col in self._state.keys():
+            for col in self._state[row].keys():
                 pixel = pg.Surface((self._mult, self._mult))
                 pixel.fill({0: BLACK, 1: WHITE}[self._state[row][col]])
                 self._SURFACE.blit(pixel, ((row)*self._mult, (col)*self._mult))
@@ -102,7 +102,7 @@ class GameOfLife:
     TX12 = pg.font.Font("assets/guifont.ttf", 12)
     
     def disp_speed(self):
-        text = self.TX16.render(f"Speed {('2', '1', '.5')[self._speed_ptr]:>2}x", True, WHITE, self._background)
+        text = self.TX16.render(f"Speed {('4', '2', '1', '.5')[self._speed_ptr]:>2}x", True, WHITE, self._background)
         self._SURFACE.blit(text, (5, self._width - self._footer_sz + 10))
 
     def disp_version(self):
@@ -112,10 +112,12 @@ class GameOfLife:
                             self._width - 3*self._mult))
         self._SURFACE.blit(text2, (self._length - 6*self._mult,
                             self._width - 2*self._mult))
+
     IMG_0X = pg.image.load("assets/Stop.png")
     IMG_05X = pg.image.load("assets/Speed05x.png")
     IMG_1X = pg.image.load("assets/Speed1x.png")
     IMG_2X = pg.image.load("assets/Speed2x.png")
+    IMG_4X = pg.image.load("assets/Speed4x.png") # Temporary
     BLANK = pg.Surface((64, 64))
     BLANK.fill(_background)
 
@@ -126,27 +128,39 @@ class GameOfLife:
 
     def disp_speed_icons(self):
         self._SURFACE.blit(self.BLANK, (0, self._width - self._footer_sz + 3*self._mult))
-        self._SURFACE.blit({2: self.IMG_05X, 1: self.IMG_1X, 0: self.IMG_2X}[self._speed_ptr],
+        self._SURFACE.blit({3: self.IMG_05X, 2: self.IMG_1X, 1: self.IMG_2X, 0: self.IMG_4X}[self._speed_ptr],
                 (0, self._width - self._footer_sz + 3*self._mult))
+
+class Main_Menu:
+    def display_main_menu(self):
+        pass
+
+    def __init__(self, length, width):
+        self._length = length
+        self._width = width
+        self.display_main_menu()
+
+    def get_input(self):
+        print()
 
 def main():
     # Initial
     running = True
 
     # Profile
-    Game = GameOfLife((600, 600))
+    Menu = Main_Menu(1000, 600)
+    Game = GameOfLife((Menu._length, Menu._width))
     Game.disp_border()
     Game.disp_version()
-    seed = tuple([(x, x) for x in range(len(Game._state))] + 
-                 [(x, len(Game._state) - 1 - x) for x in range(len(Game._state))] +
-                 [((len(Game._state) - 1) // 2, y) for y in range(len(Game._state[0]))] + 
-                 [(x, (len(Game._state) - 1) // 2) for x in range(len(Game._state))])
+    seed = Game.rand_seed()
 
     # Process
     Game.plant_seed(seed)
     Game.render()
     pg.display.flip()
     time.sleep(Game._speed[Game._speed_ptr])
+    
+    # Game Loop
     while running:
         for event in pg.event.get():
             if event.type == QUIT:
