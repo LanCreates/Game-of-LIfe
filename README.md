@@ -11,8 +11,10 @@ Make sure your points aren't out of bounds!</p>
 <p> The game feels too fast or too slow? Go with your desired pace by controlling the speed by pressing up or down arrow button! </p>
 
 ## Controls
-- <Space> -> pause
-- <Space>, r -> replay
-- <Esc> -> exit
-- <Up> -> Increase Speed
-- <Down> -> Decrease Speed
+- Space -> pause
+- Space, r -> replay
+- Esc -> exit
+- Up -> Increase Speed
+- Down -> Decrease Speed
+
+Note: colon (,) means that press the next key after the previous one
